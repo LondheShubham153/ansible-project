@@ -1,0 +1,80 @@
+---
+- name: Deploy Django Notes App with Docker Compose v2
+  hosts: Servers
+  become: yes
+
+  vars:
+    app_dir: /var/www/django-notes-app
+    repo_url: https://github.com/LondheShubham153/django-notes-app.git
+
+  tasks:
+
+    - name: Install prerequisites for Docker
+      apt:
+        name: "{{ item }}"
+        state: present
+        update_cache: yes
+      loop:
+        - apt-transport-https
+        - ca-certificates
+        - curl
+        - gnupg-agent
+        - software-properties-common
+
+    - name: Add Docker’s official GPG key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+
+    - name: Add Docker APT repository
+      apt_repository:
+        repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_facts['lsb']['codename'] }} stable
+        state: present
+
+    - name: Update APT package index after adding Docker repository
+      apt:
+        update_cache: yes
+
+    - name: Install Docker Engine and Docker Compose v2
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-compose-plugin
+        state: present
+        update_cache: yes
+
+    - name: Ensure Docker service is started and enabled
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Install Git
+      apt:
+        name: git
+        state: present
+
+    - name: Ensure application directory exists
+      file:
+        path: "{{ app_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Clone the latest code from repository
+      git:
+        repo: "{{ repo_url }}"
+        dest: "{{ app_dir }}"
+        version: main
+        force: yes
+
+    - name: Build and start Docker containers using Docker Compose v2
+      command: docker compose up -d --build
+      args:
+        chdir: "{{ app_dir }}"
+
+    - name: Verify that the containers are running
+      command: docker ps
+      args:
+        chdir: "{{ app_dir }}"
